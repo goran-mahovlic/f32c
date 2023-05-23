@@ -1,4 +1,4 @@
-ghdl --ieee=synopsys -fexplicit -frelaxed-rules --latches --work=work \
+ghdl --ieee=synopsys -fexplicit -frelaxed-rules --work=work \
   ../../../../cpu/defs_mi32.vhd \
   ../../../../cpu/defs_rv32.vhd \
   ../../../../cpu/defs_f32c.vhd \
