@@ -23,7 +23,7 @@ begin
       out0_Hz => 112500000,
       out1_Hz => 168750000,
       out2_Hz =>  96428571,
-      out3_Hz =>  84375000
+      out3_Hz =>  51920000, out3_tol_hz => 1000000
     )
     port map
     (

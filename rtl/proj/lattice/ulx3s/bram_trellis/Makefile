@@ -3,7 +3,7 @@ all: $(PROJ).bit
 
 FPGA_SIZE=12
 
-CONSTRAINTS=../../constraints/ulx3s_v20.lpf
+CONSTRAINTS=../../constraints/ulx3s_v20_f32c.lpf
 
 FILES=
 

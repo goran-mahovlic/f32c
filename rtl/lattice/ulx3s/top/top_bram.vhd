@@ -39,15 +39,15 @@ entity glue is
 	C_mul_reg: boolean := false;
 	C_debug: boolean := false;
 
-	C_clk_freq: integer := 84;
+	C_clk_freq: integer := 52;
 
 	-- SoC configuration options
 	C_bram_size: integer := 32;
 	C_sio: integer := 1;
-	C_spi: integer := 0;
+	C_spi: integer := 1;
 	C_gpio: integer := 0;
 	C_simple_io: boolean := true;
-	C_timer: boolean := false
+	C_timer: boolean := true
     );
     port (
 	clk_25m: in std_logic;
@@ -56,7 +56,8 @@ entity glue is
 	led: out std_logic_vector(7 downto 0);
 	btn_pwr, btn_f1, btn_f2: in std_logic;
 	btn_up, btn_down, btn_left, btn_right: in std_logic;
-	sw: in std_logic_vector(3 downto 0)
+	sw: in std_logic_vector(3 downto 0);
+	ftdi_txden: out std_logic
     );
 end glue;
 
@@ -112,7 +113,7 @@ begin
 
     clk <= clk_112m5 when C_clk_freq = 112
       else clk_96m43 when C_clk_freq = 96
-      else clk_84m34 when C_clk_freq = 84
+      else clk_84m34 when C_clk_freq = 52
       else '0';
     reset <= not pll_lock or sio_break;
 
