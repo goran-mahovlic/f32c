@@ -1,6 +1,5 @@
 --
--- Copyright (c) 2008 - 2016 Marko Zec, University of Zagreb
--- All rights reserved.
+-- Copyright (c) 2008 - 2023 Marko Zec
 --
 -- Redistribution and use in source and binary forms, with or without
 -- modification, are permitted provided that the following conditions
@@ -22,8 +21,6 @@
 -- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
---
--- $Id$
 --
 
 library ieee;
@@ -113,7 +110,6 @@ architecture Behavioral of pipeline is
     -- pipeline stage 1: instruction fetch
     signal IF_PC, IF_PC_next, IF_PC_ext_next: std_logic_vector(31 downto 2);
     signal IF_bpredict_index: std_logic_vector(12 downto 0);
-    signal IF_bpredict_re: std_logic;
     signal IF_instruction: std_logic_vector(31 downto 0);
     signal IF_data_ready, IF_fetch_complete, IF_need_refetch: boolean;
     -- boundary to stage 2
@@ -211,6 +207,7 @@ architecture Behavioral of pipeline is
     signal EX_eff_alu_op2: std_logic_vector(31 downto 0);
     signal EX_shamt: std_logic_vector(4 downto 0);
     signal EX_from_shift: std_logic_vector(31 downto 0);
+    signal EX_alu_ex, EX_alu_ey: std_logic_vector(32 downto 0);
     signal EX_from_alu_addsubx: std_logic_vector(32 downto 0);
     signal EX_from_alu_logic, EX_from_alt: std_logic_vector(31 downto 0);
     signal EX_from_cop0: std_logic_vector(31 downto 0);
@@ -257,7 +254,6 @@ architecture Behavioral of pipeline is
     signal MEM_running, MEM_take_branch: boolean;
     signal MEM_cancel_EX: boolean;
     signal MEM_bpredict_score: std_logic_vector(1 downto 0);
-    signal MEM_bpredict_we: std_logic;
     signal MEM_eff_data: std_logic_vector(31 downto 0);
     signal MEM_shamt_1_2_4: std_logic_vector(2 downto 0);
     signal MEM_data_in, MEM_from_shift: std_logic_vector(31 downto 0);
@@ -278,6 +274,27 @@ architecture Behavioral of pipeline is
     signal WB_writeback_data: std_logic_vector(31 downto 0);
     signal WB_mem_data_aligned: std_logic_vector(31 downto 0);
     signal WB_clk: std_logic;
+
+    -- three (four) port register file
+    type reg_type is array(0 to 31) of std_logic_vector(31 downto 0);
+    signal M_R1, M_R2, M_RD: reg_type;
+    attribute ram_style: string; -- XST / Vivado
+    attribute ram_style of M_R1: signal is "distributed";
+    attribute ram_style of M_R2: signal is "distributed";
+    attribute ram_style of M_RD: signal is "distributed";
+    attribute syn_ramstyle: string; -- Lattice Diamond
+    attribute syn_ramstyle of M_R1: signal is "distributed";
+    attribute syn_ramstyle of M_R2: signal is "distributed";
+    attribute syn_ramstyle of M_RD: signal is "distributed";
+    attribute ramstyle: string; -- Altera Quartus
+    attribute ramstyle of M_R1: signal is "distributed";
+    attribute ramstyle of M_R2: signal is "distributed";
+    attribute ramstyle of M_RD: signal is "distributed";
+
+    -- branch predictor's block RAM
+    type bptrace_type is array(0 to 8191) of std_logic_vector(1 downto 0);
+    signal M_bptrace: bptrace_type;
+    attribute syn_ramstyle of M_bptrace: signal is "no_rw_check";
 
     -- multiplication unit
     signal EX_mul_start, R_mul_commit, R_mul_done, mul_done: boolean;
@@ -459,14 +476,20 @@ begin
       EX_MEM_branch_hist xor IF_PC(14 downto (15 - C_bp_global_depth));
     IF_bpredict_index((12 - C_bp_global_depth) downto 0) <=
       IF_PC((14 - C_bp_global_depth) downto 2);
-    IF_bpredict_re <= '1' when ID_running else '0';
 
-    bptrace: entity work.bptrace
-    port map (
-	din => MEM_bpredict_score, dout => IF_ID_bpredict_score,
-	rdaddr => IF_bpredict_index, wraddr => EX_MEM_bpredict_index,
-	re => IF_bpredict_re, we => MEM_bpredict_we, clk => clk
-    );
+    process(clk)
+    begin
+	if rising_edge(clk) then
+	    if EX_MEM_branch_cycle then
+		M_bptrace(conv_integer(EX_MEM_bpredict_index)) <=
+		  MEM_bpredict_score;
+	    end if;
+	    if ID_running then
+		IF_ID_bpredict_score <=
+		  M_bptrace(conv_integer(IF_bpredict_index));
+	    end if;
+	end if;
+    end process;
     end generate;
 
     --
@@ -544,19 +567,17 @@ begin
     );
     end generate;
 
+    --
     -- three- or four-ported register file: 2(3) async reads, 1 sync write
-    regfile: entity work.reg1w2r
-    generic map (
-	C_synchronous_read => C_regfile_synchronous_read,
-	C_debug => C_debug
-    )
-    port map (
-	rd1_addr => ID_reg1_addr, rd2_addr => ID_reg2_addr,
-	rdd_addr => trace_addr(4 downto 0), wr_addr => MEM_WB_writeback_addr,
-	rd1_data => ID_reg1_data, rd2_data => ID_reg2_data,
-	rdd_data => reg_trace_data, wr_data => WB_writeback_data,
-	wr_enable => MEM_WB_write_enable, rd_clk => clk, wr_clk => WB_clk
-    );
+    --
+    process(clk, ID_reg1_addr, ID_reg2_addr, trace_addr, M_R1, M_R2, M_RD)
+    begin
+	if not C_regfile_synchronous_read or falling_edge(clk) then
+	    ID_reg1_data <= M_R1(conv_integer(ID_reg1_addr));
+	    ID_reg2_data <= M_R2(conv_integer(ID_reg2_addr));
+	    reg_trace_data <= M_RD(conv_integer(trace_addr(4 downto 0)));
+        end if;
+    end process;
 
     --
     -- WB_writeback_data overrides register reads with pipelined load aligner.
@@ -564,6 +585,19 @@ begin
     -- at the half of the clk cycle, in which case no bypass logic is required.
     --
     WB_clk <= clk when C_load_aligner else not clk;
+    process(WB_clk)
+    begin
+	if rising_edge(WB_clk) then
+	    if MEM_WB_write_enable = '1' then
+		M_R1(conv_integer(MEM_WB_writeback_addr)) <= WB_writeback_data;
+		M_R2(conv_integer(MEM_WB_writeback_addr)) <= WB_writeback_data;
+	    end if;
+	    if C_debug and MEM_WB_write_enable = '1' then
+		M_RD(conv_integer(MEM_WB_writeback_addr)) <= WB_writeback_data;
+	    end if;
+	end if;
+    end process;
+
     ID_reg1_eff_data <= IF_ID_EPC & "00" when C_arch = ARCH_RV32 and ID_reg1_pc
       else ID_reg1_data when (not C_load_aligner and
       (not C_regfile_synchronous_read or
@@ -846,7 +880,7 @@ begin
 		ID_EX_wait <= false;
 	    end if;
 	end if;
-	end if;
+    end if;
     end process;
 
 
@@ -875,18 +909,35 @@ begin
       WB_eff_data when ID_EX_fwd_mem_alu_op2 and C_result_forwarding else
       ID_EX_alu_op2;
 
-    -- instantiate the ALU
-    alu: entity work.alu
-    generic map (
-	C_sign_extend => C_sign_extend
-    )
-    port map (
-	x => EX_eff_reg1, y => EX_eff_alu_op2,
-	seb_seh_cycle => ID_EX_seb_seh_cycle,
-	seb_seh_select => ID_EX_seb_seh_select,
-	addsubx => EX_from_alu_addsubx, logic => EX_from_alu_logic,
-	funct => ID_EX_op_minor(1 downto 0)
-    );
+    -- ALU
+    EX_alu_ex <= '0' & EX_eff_reg1;
+    EX_alu_ey <= '0' & EX_eff_alu_op2;
+    EX_from_alu_addsubx <= EX_alu_ex + EX_alu_ey when ID_EX_op_minor(1) = '0'
+      else EX_alu_ex - EX_alu_ey;
+
+    process(EX_eff_reg1, EX_eff_alu_op2, ID_EX_op_minor, ID_EX_seb_seh_cycle,
+      ID_EX_seb_seh_select)
+	variable logic: std_logic_vector(31 downto 0);
+    begin
+	case ID_EX_op_minor(1 downto 0) is
+	when "00" =>	logic := EX_eff_reg1 and EX_eff_alu_op2;
+	when "01" =>	logic := EX_eff_reg1 or EX_eff_alu_op2;
+	when "10" =>	logic := EX_eff_reg1 xor EX_eff_alu_op2;
+	when others =>	logic := not(EX_eff_reg1 or EX_eff_alu_op2);
+	end case;
+
+	if C_sign_extend and ID_EX_seb_seh_cycle then
+	    if ID_EX_seb_seh_select = '1' then
+		EX_from_alu_logic(31 downto 16) <= (others => logic(15));
+		EX_from_alu_logic(15 downto 0) <= logic(15 downto 0);
+	    else
+		EX_from_alu_logic(31 downto 8) <= (others => logic(7));
+		EX_from_alu_logic(7 downto 0) <= logic(7 downto 0);
+	    end if;
+	else
+	    EX_from_alu_logic <= logic;
+	end if;
+    end process;
 
     -- compute shift amount and function
     EX_2bit_add <= EX_eff_reg1(1 downto 0) + ID_EX_alu_op2(1 downto 0);
@@ -1239,7 +1290,6 @@ begin
     -- branch prediction
     G_bp_update_score:
     if C_branch_prediction and C_arch /= ARCH_RV32 generate
-    MEM_bpredict_we <= '1' when EX_MEM_branch_cycle else '0';
     process(clk, clk_enable)
     begin
 	if falling_edge(clk) and clk_enable = '1'

@@ -20,10 +20,11 @@ begin
     generic map
     (
         in_Hz =>  25000000,
-      out0_Hz => 112500000,
-      out1_Hz => 168750000,
+      out0_Hz => 168750000,
+      out1_Hz => 112500000,
       out2_Hz =>  96428571,
-      out3_Hz =>  51920000, out3_tol_hz => 1000000
+      --out3_Hz =>  51920000, out3_tol_hz => 1000000
+      out3_Hz =>  84375000
     )
     port map
     (
@@ -31,8 +32,8 @@ begin
       clk_o   => S_clocks,
       locked  => lock
     );
-    clk_112m5  <= S_clocks(0); 
-    clk_168m75 <= S_clocks(1); 
+    clk_112m5  <= S_clocks(1); 
+    clk_168m75 <= S_clocks(0); 
     clk_96m43  <= S_clocks(2); 
     clk_84m34  <= S_clocks(3); 
 end Structure;

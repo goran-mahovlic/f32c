@@ -1,9 +1,9 @@
 PROJ=f32c
 all: $(PROJ).bit
 
-FPGA_SIZE=12
+FPGA_SIZE=um-85
 
-CONSTRAINTS=../../constraints/ulx3s_v20.lpf
+CONSTRAINTS=../../constraints/ulx3s_v20_f32c.lpf
 
 FILES=
 

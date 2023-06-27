@@ -34,7 +34,7 @@ package sdram_pack is
 --
 -- SDRAM port type
 --
-type sdram_port_type is
+type sdram_iport_type is
     record
 	-- consumer -> DRAM
 	addr: std_logic_vector(31 downto 2);
@@ -43,11 +43,16 @@ type sdram_port_type is
 	addr_strobe: std_logic;
 	burst_len: std_logic_vector(2 downto 0);
 	write: std_logic;
+    end record;
+
+type sdram_oport_type is
+    record
 	-- DRAM -> consumer
 	data_out: std_logic_vector(31 downto 0);
 	data_ready: std_logic;
     end record;
 
-type sdram_port_array is array(0 to 15) of sdram_port_type;
+type sdram_iport_array is array(0 to 15) of sdram_iport_type;
+type sdram_oport_array is array(0 to 15) of sdram_oport_type;
 
 end;

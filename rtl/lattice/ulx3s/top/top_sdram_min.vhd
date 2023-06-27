@@ -3,16 +3,15 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 use work.f32c_pack.all;
-library ecp5u;
-use ecp5u.components.all;
 
 
 entity top_sdram is
     generic (
 	C_arch: natural := ARCH_MI32;
 	C_clk_freq: natural := 84;
-	C_icache_size: natural := 16;
-	C_dcache_size: natural := 16
+	C_icache_size: natural := 0;
+	C_dcache_size: natural := 0;
+    C_branch_prediction: boolean := false
     );
     port (
 	clk_25m: in std_logic;
@@ -139,22 +138,14 @@ begin
     R_simple_in <= sw & x"00" & '0' & not btn_pwr & btn_f2 & btn_f1
       & btn_up & btn_down & btn_left & btn_right when rising_edge(clk);
 
-    -- SPI flash clock has to be routed through a ECP5-specific primitive
-    I_flash_mux: USRMCLK
-    port map (
-	USRMCLKTS => flash_csn,
-	USRMCLKI => flash_sck
-    );
-    flash_cen <= flash_csn;
-
     I_pll: entity work.pll_25m
     port map (
-	clk_25m => clk_25m,
-	clk_168m75 => open,
-	clk_112m5 => clk_112m5,
-	clk_96m43 => clk_96m43,
-	clk_84m34 => clk_84m34,
-	lock => pll_lock
+       clk_25m => clk_25m,
+       clk_168m75 => open,
+       clk_112m5 => clk_112m5,
+       clk_96m43 => clk_96m43,
+       clk_84m34 => clk_84m34,
+       lock => pll_lock
     );
 
     clk <= clk_112m5 when C_clk_freq = 112
@@ -162,4 +153,7 @@ begin
       else clk_84m34 when C_clk_freq = 84
       else '0';
     reset <= not pll_lock or sio_break;
+
+--    clk <= clk_25m;
+--    reset <= sio_break;
 end x;

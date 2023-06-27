@@ -347,12 +347,10 @@ begin
     port map (
 	clk => clk,
 	we_a => icache_write, we_b => icache_write,
-	addr_a(C_i_addr_bits - 2) => '0',
-	addr_a(C_i_addr_bits - 3 downto 0) =>
-	  i_addr(C_i_addr_bits - 1 downto 2),
-	addr_b(C_i_addr_bits - 2) => '1',
-	addr_b(C_i_addr_bits - 3 downto 0) =>
-	  i_addr(C_i_addr_bits - 1 downto 2),
+	addr_a(9) => '0',
+	addr_a(8 downto 0) => i_addr(C_i_addr_bits - 1 downto 2),
+	addr_b(9) => '1',
+	addr_b(8 downto 0) => i_addr(C_i_addr_bits - 1 downto 2),
 	data_in_a => to_i_bram(0 * 18 + 17 downto 0 * 18),
 	data_in_b => to_i_bram(1 * 18 + 17 downto 1 * 18),
 	data_out_a => from_i_bram(0 * 18 + 17 downto 0 * 18),
@@ -448,9 +446,9 @@ begin
     iaddr_cacheable <= C_icache_size /= 0;
     icache_write <= imem_data_ready when R_i_strobe = '1' else '0';
     iaddr_in_xram <= '1' when R_i_addr(31 downto 28) = C_xram_base else '0';
-    icache_tag_in <= '1' & iaddr_in_xram
-      & R_i_addr(C_cached_addr_bits - 1 downto C_i_addr_bits)
-      when C_icache_size /= 0;
+    --icache_tag_in <= '1' & iaddr_in_xram
+      --& R_i_addr(C_cached_addr_bits - 1 downto C_i_addr_bits)
+      --when C_icache_size /= 0;
     icache_line_valid <= iaddr_cacheable and icache_tag_in = icache_tag_out;
 
     --

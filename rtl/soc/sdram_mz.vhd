@@ -67,7 +67,8 @@ entity SDRAM_Controller is
 	reset: in  STD_LOGIC;
 
 	-- To internal bus / logic blocks
-	mpbus: inout sdram_port_array;
+	mpbus_i: in sdram_iport_array;
+	mpbus_o: out sdram_oport_array;
 	snoop_addr: out std_logic_vector(31 downto 2);
 	snoop_cycle: out std_logic;
 
@@ -213,20 +214,19 @@ architecture Behavioral of SDRAM_Controller is
 
 begin
     -- Inbound multiport mux
-    addr_strobe <= mpbus(R_next_port).addr_strobe;
-    write <= mpbus(R_next_port).write;
-    byte_sel <= mpbus(R_next_port).byte_sel;
-    addr(mpbus(0).addr'high - 2 downto 0) <= mpbus(R_next_port).addr;
-    data_in <= mpbus(R_next_port).data_in;
-    burst_len <= mpbus(R_next_port).burst_len;
+    addr_strobe <= mpbus_i(R_next_port).addr_strobe;
+    write <= mpbus_i(R_next_port).write;
+    byte_sel <= mpbus_i(R_next_port).byte_sel;
+    addr(mpbus_i(0).addr'high - 2 downto 0) <= mpbus_i(R_next_port).addr;
+    data_in <= mpbus_i(R_next_port).data_in;
+    burst_len <= mpbus_i(R_next_port).burst_len;
 
     -- Outbound multiport demux
     process(R_ready_out, R_from_sdram)
-	variable i: integer;
     begin
 	for i in 0 to (C_ports - 1) loop
-	    mpbus(i).data_ready <= R_ready_out(i);
-	    mpbus(i).data_out <= R_from_sdram & R_from_sdram_prev;
+	    mpbus_o(i).data_ready <= R_ready_out(i);
+	    mpbus_o(i).data_out <= R_from_sdram & R_from_sdram_prev;
 	end loop;
     end process;
 
@@ -270,15 +270,15 @@ begin
     sdram_data <= iob_data when iob_dq_hiz = '0' else (others => 'Z');
 
     -- Arbiter: round-robin port selection combinatorial logic
-    process(mpbus, R_cur_port)
-	variable i, j, t, n: integer;
+    process(mpbus_i, R_cur_port)
+	variable t, n: integer;
     begin
 	t := R_cur_port;
 	for i in 0 to (C_ports - 1) loop
 	    for j in 1 to C_ports loop
 		if R_cur_port = i then
 		    n := (i + j) mod C_ports;
-		    if mpbus(n).addr_strobe = '1' and n /= C_prio_port then
+		    if mpbus_i(n).addr_strobe = '1' and n /= C_prio_port then
 			t := n;
 			exit;
 		    end if;
